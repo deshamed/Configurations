@@ -1,3 +1,5 @@
+# Define the batch script content
+$batchScript = @"
 @echo off
 title XACO - Custom Cleanup v2
 color 0A
@@ -83,3 +85,14 @@ echo                Custom Cleanup Complete!
 echo -------------------------------------------------------
 timeout /t 3 /nobreak >nul
 exit
+"@
+
+# Write the batch script to a temporary file
+$batFile = [System.IO.Path]::Combine($env:TEMP, "TemporaryFileCleaner.bat")
+$batchScript | Set-Content -Path $batFile
+
+# Execute the batch script using cmd.exe
+Start-Process "cmd.exe" -ArgumentList "/c $batFile" -NoNewWindow -Wait
+
+# Optionally, remove the batch file after execution
+Remove-Item -Path $batFile
