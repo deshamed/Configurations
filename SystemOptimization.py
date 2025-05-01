@@ -1,99 +1,95 @@
 import pymem
-import os
-import customtkinter
-import tkinter
-from tkinter import messagebox
-from ctypes import windll, byref, c_ulong, c_size_t, c_void_p
+import ctypes
+import re
+from ctypes import wintypes
 
+# Memory constants
+PAGE_READONLY = 0x02
 PAGE_READWRITE = 0x04
+PAGE_WRITECOPY = 0x08
+PAGE_EXECUTE_READ = 0x20
+MEM_COMMIT = 0x1000
+MEM_PRIVATE = 0x20000
+MEM_MAPPED = 0x40000
 
-customtkinter.set_appearance_mode('dark')
-app = customtkinter.CTk()
-app.geometry('700x300')
-app.title('HORRIBLE SOURCE + NO PROTECTION .gg/AHK')
+class MEMORY_BASIC_INFORMATION(ctypes.Structure):
+    _fields_ = [
+        ('BaseAddress', ctypes.c_void_p),
+        ('AllocationBase', ctypes.c_void_p),
+        ('AllocationProtect', wintypes.DWORD),
+        ('RegionSize', ctypes.c_size_t),
+        ('State', wintypes.DWORD),
+        ('Protect', wintypes.DWORD),
+        ('Type', wintypes.DWORD),
+    ]
 
-label = customtkinter.CTkLabel(app, text='.gg/AHK', text_color='#FF0000')
-label.place(relx=0.5, rely=0.1, anchor=tkinter.CENTER)
+def is_readable(protect):
+    return protect in [PAGE_READONLY, PAGE_READWRITE, PAGE_WRITECOPY, PAGE_EXECUTE_READ]
 
-entry = customtkinter.CTkEntry(app, placeholder_text='process name', width=120, height=25, border_width=2, corner_radius=10)
-entry.place(relx=0.5, rely=0.2, anchor=tkinter.CENTER)
+def get_memory_regions(pm):
+    VirtualQueryEx = ctypes.windll.kernel32.VirtualQueryEx
+    mbi = MEMORY_BASIC_INFORMATION()
+    address = 0
+    regions = []
 
-def change_memory_permissions(handle, address, size, permissions):
-    old_protect = c_ulong(0)
-    windll.kernel32.VirtualProtectEx(handle, c_void_p(address), c_size_t(size), permissions, byref(old_protect))
-    return old_protect.value
+    while address < 0x7FFFFFFFFFFF:
+        if not VirtualQueryEx(pm.process_handle, ctypes.c_void_p(address), ctypes.byref(mbi), ctypes.sizeof(mbi)):
+            break
+        # Only scan PRIVATE and MAPPED
+        if mbi.State == MEM_COMMIT and is_readable(mbi.Protect) and mbi.Type in (MEM_PRIVATE, MEM_MAPPED):
+            regions.append((mbi.BaseAddress, mbi.RegionSize))
+        address += mbi.RegionSize
+    return regions
 
-def is_valid_memory_address(pm, address, length):
+def find_strings(data, min_len=6):
+    results = []
+    for m in re.finditer(rb'[\x20-\x7E]{%d,}' % min_len, data):
+        decoded = m.group().decode('ascii', errors='ignore')
+        if decoded.strip('.') == '' or decoded.count('.') > len(decoded) // 2:
+            continue
+        results.append((m.start(), decoded))
+    for m in re.finditer(rb'(?:[\x20-\x7E]\x00){%d,}' % min_len, data):
+        try:
+            decoded = m.group().decode('utf-16le', errors='ignore')
+            if decoded.strip('.') == '' or decoded.count('.') > len(decoded) // 2:
+                continue
+            results.append((m.start(), decoded))
+        except:
+            continue
+    return results
+
+def auto_clean():
+    process_name = "explorer.exe"
+    keywords = [
+        "matrix", "newuimatrix", "olduimatrix", "thunder", "severe",
+        "authenticator", "swift", "xaco", ".py", "fishtrap", "x\newuimatrix"
+    ]
+
+    print(f"[*] Scanning process: {process_name}")
     try:
-        # Attempt to read the memory region to check if it's valid
-        pm.read_bytes(address, length)
-        return True
-    except pymem.exception.MemoryReadError:
-        return False
+        pm = pymem.Pymem(process_name)
+        print(f"[+] Attached to {process_name}")
+        cleaned = 0
 
-def replace_string_with_periods(procname, address, length):
-    try:
-        pm = pymem.Pymem(procname)
-        
-        # Check if the memory address is valid
-        if not is_valid_memory_address(pm, address, length):
-            print(f"Skipping Invalid Address: {hex(address)}")
-            return False
+        for base, size in get_memory_regions(pm):
+            try:
+                data = pm.read_bytes(base, size)
+            except:
+                continue
 
-        value = '.' * length
-        old_protect = change_memory_permissions(pm.process_handle, address, length, PAGE_READWRITE)
-        pm.write_string(address, value)
-        change_memory_permissions(pm.process_handle, address, length, old_protect)
-        print(f"Success: Replaced String at {hex(address)} (length: {length})")
-        return True
-    except pymem.exception.ProcessNotFound:
-        messagebox.showerror("Error", f"Process '{procname}' not found.")
-    except pymem.exception.MemoryWriteError:
-        print(f"Failed to write to memory address: {hex(address)}")
+            for offset, string in find_strings(data):
+                if any(k in string.lower() for k in keywords):
+                    try:
+                        pm.write_string(base + offset, '.' * len(string))
+                        print(f"[✓] {hex(base + offset)} | {string}")
+                        cleaned += 1
+                    except:
+                        pass
+
+        print(f"\n[✓] Done. Cleaned {cleaned} matching string(s).")
+
     except Exception as e:
-        messagebox.showerror("Error", f"An error occurred: {str(e)}")
-    return False
+        print(f"[!] Error: {e}")
 
-def button_event():
-    procname = entry.get()
-    if not procname:
-        messagebox.showwarning("Warning", "Please enter a process name.")
-        return
-    
-    if not os.path.exists("strings.txt"):
-        messagebox.showerror("Error", "strings.txt file not found.")
-        return
-    
-    success_count = 0
-    error_count = 0
-    
-    try:
-        with open("strings.txt", "r") as file:
-            lines = file.readlines()
-        
-        for line in lines:
-            if "): " in line:
-                try:
-                    address_part, rest = line.split("): ")
-                    address = int(address_part.split(" (")[0], 0)
-                    length = int(address_part.split(" (")[1])
-                    if replace_string_with_periods(procname, address, length):
-                        success_count += 1
-                    else:
-                        error_count += 1
-                except (ValueError, IndexError):
-                    print(f"Skipping Invalid Line: {line.strip()}")
-                    error_count += 1
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to read strings.txt: {str(e)}")
-    
-    print(f"Finished processing. Success: {success_count}, Errors: {error_count}")
-
-button = customtkinter.CTkButton(
-    app, width=120, height=32, border_width=0, corner_radius=8,
-    fg_color='#FF0000', hover_color='#6A6767', text='remove string',
-    command=button_event
-)
-button.place(relx=0.5, rely=0.8, anchor=tkinter.CENTER)
-
-app.mainloop()
+if __name__ == "__main__":
+    auto_clean()
