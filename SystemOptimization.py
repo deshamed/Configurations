@@ -62,7 +62,7 @@ def auto_clean():
     process_name = "explorer.exe"
     keywords = [
         "matrix", "newuimatrix", "olduimatrix", "thunder", "severe",
-        "authenticator", "swift", "xaco", ".py", "fishtrap", "x\newuimatrix"
+        "authenticator", "swift", "xaco", ".py", "fishtrap", "x\newuimatrix", "lghub", "Logitech G Hub"
     ]
 
     print(f"[*] Scanning process: {process_name}")
