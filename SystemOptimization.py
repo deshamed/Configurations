@@ -43,12 +43,16 @@ def get_memory_regions(pm):
 
 def find_strings(data, min_len=6):
     results = []
-    for m in re.finditer(rb'[\x20-\x7E]{%d,}' % min_len, data):
+    ascii_pattern = rb'[\x20-\x7E]{%d,}' % min_len
+    utf16_pattern = rb'(?:[\x20-\x7E]\x00){%d,}' % min_len
+
+    for m in re.finditer(ascii_pattern, data):
         decoded = m.group().decode('ascii', errors='ignore')
         if decoded.strip('.') == '' or decoded.count('.') > len(decoded) // 2:
             continue
         results.append((m.start(), decoded))
-    for m in re.finditer(rb'(?:[\x20-\x7E]\x00){%d,}' % min_len, data):
+
+    for m in re.finditer(utf16_pattern, data):
         try:
             decoded = m.group().decode('utf-16le', errors='ignore')
             if decoded.strip('.') == '' or decoded.count('.') > len(decoded) // 2:
@@ -56,12 +60,13 @@ def find_strings(data, min_len=6):
             results.append((m.start(), decoded))
         except:
             continue
+
     return results
 
 def auto_clean():
     process_name = "explorer.exe"
     keywords = [
-        "matrix", "thunder", "celex", "severe", "authenticator", "isabelle", "swift", "xeno", "wavebootstrapper", "photon", "yerba", "matcha", "mapper", "assembly", "imgui"
+        "Matrix", "Software", "Assembly", "Authenticator", "Bootstrapper", "Loader"
     ]
 
     print(f"[*] Scanning process: {process_name}")
@@ -72,18 +77,22 @@ def auto_clean():
 
         for base, size in get_memory_regions(pm):
             try:
-                data = pm.read_bytes(base, size)
-            except:
+                # Read memory in smaller chunks to capture strings that might be split
+                chunk_size = 4096
+                for offset in range(0, size, chunk_size):
+                    data = pm.read_bytes(base + offset, min(chunk_size, size - offset))
+                    for string_offset, string in find_strings(data):
+                        absolute_offset = base + offset + string_offset
+                        if any(k in string.lower() for k in keywords):
+                            try:
+                                pm.write_string(absolute_offset, '.' * len(string))
+                                print(f"[✓] {hex(absolute_offset)} | {string}")
+                                cleaned += 1
+                            except Exception as e:
+                                print(f"[!] Error writing to memory at {hex(absolute_offset)}: {e}")
+            except Exception as e:
+                print(f"[!] Error reading memory at {hex(base)}: {e}")
                 continue
-
-            for offset, string in find_strings(data):
-                if any(k in string.lower() for k in keywords):
-                    try:
-                        pm.write_string(base + offset, '.' * len(string))
-                        print(f"[✓] {hex(base + offset)} | {string}")
-                        cleaned += 1
-                    except:
-                        pass
 
         print(f"\n[✓] Done. Cleaned {cleaned} matching string(s).")
 
