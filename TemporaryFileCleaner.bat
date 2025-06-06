@@ -1,94 +1,95 @@
-$batchScript = @"
-@echo off
-title XACO - Custom Cleanup v2
-color 0A
-cls
+# Define the paths and registry keys to be cleaned
+$pathsToDelete = @(
+    "C:\assembly",
+    "C:\v2",
+    "$env:LOCALAPPDATA\dependencies",
+    "$env:USERPROFILE\AppData\Roaming\Microsoft\Windows\Recent"
+)
 
-echo.
-echo -------------------------------------------------------
-echo                XACO: Custom Cleanup v2                 
-echo -------------------------------------------------------
-echo.
+$registryKeysToDelete = @(
+    "HKCU\Software\severe v2",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\OpenSavePidlMRU\txt",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\TypedPaths",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellBags",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartPage",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExplorer\LastVisitedPidlMRU",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\MuiCache",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Appswitched",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Program Compatibility Assistant\History"
+)
 
-:: [1] Delete custom registry key
-echo [1/10] Deleting custom registry key...
-reg delete "HKCU\severe v2" /f >nul 2>&1
+# Keywords for Prefetch cleaning
+$prefetchKeywords = @(
+    "authenticator",
+    "software",
+    "assembly",
+    "wscript",
+    "reg",
+    "regedit",
+    "taskkill",
+    "smartscreen"
+)
 
-:: [2] Delete file at C:\v2
-echo [2/10] Deleting C:\v2 file...
-del /f /q "C:\v2" >nul 2>&1
+# Delete specified paths
+foreach ($path in $pathsToDelete) {
+    if (Test-Path $path) {
+        Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "Deleted: $path"
+    }
+}
 
-:: [3] Mass registry deletion
-echo [3/10] Running advanced registry cleanup...
-reg delete "HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Compatibility Assistant\Store" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\Software\WinRAR\ArcHistory" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\OpenSavePidlMRU\dll" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\OpenSavePidlMRU\exe" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs" /f /va >nul 2>&1
-reg delete "HKEY_CLASSES_ROOT\Local Settings\Software\Microsoft\Windows\Shell\MuiCache" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\WordWheelQuery" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\Shell\BagMRU" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\Shell\Bags" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\ShellNoRoam\BagMRU" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\ShellNoRoam\Bags" /f /va >nul 2>&1
-reg delete "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search\RecentApps" /f /va >nul 2>&1
-reg delete "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\bam\UserSettings" /f /va >nul 2>&1
+# Delete specified registry keys
+foreach ($key in $registryKeysToDelete) {
+    if (Test-Path $key) {
+        Remove-Item -Path $key -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "Deleted Registry Key: $key"
+    }
+}
 
-:: [4] USN Journal and Event Logs
-echo [4/10] Cleaning USN Journal and Event Logs...
-taskkill /F /FI "SERVICES eq eventlog" >nul
-timeout /t 2 >nul
-fsutil usn deletejournal /d C: >nul
-fsutil usn deletejournal /d D: >nul
-timeout /t 2 >nul
-del /f /q "C:\Windows\System32\winevt\Logs\Application.evtx" >nul
-timeout /t 2 >nul
-sc start eventlog >nul
-echo Journal Shit on
-echo Journal Shit on
-echo Journal Shit on
-echo Journal Shit on
-echo Journal Shit on
-echo Journal Shit on
+# Clean Prefetch folder of specific .pf files
+$prefetchPath = "C:\Windows\Prefetch"
+if (Test-Path $prefetchPath) {
+    Get-ChildItem -Path $prefetchPath -Filter "*.pf" | ForEach-Object {
+        if ($prefetchKeywords -contains ($_.Name -split '\.')[0]) {
+            Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+            Write-Host "Deleted Prefetch File: $($_.Name)"
+        }
+    }
+}
 
-:: [5] Delete prefetch files
-echo [5/10] Deleting prefetch files...
-del /q /f "%SystemRoot%\Prefetch\*.*" >nul 2>&1
+# Delete BAM UserSettings
+$bamPath = "$env:LOCALAPPDATA\Microsoft\Windows\BAM"
+if (Test-Path $bamPath) {
+    Remove-Item -Path "$bamPath\UserSettings.bin" -Force -ErrorAction SilentlyContinue
+    Write-Host "Deleted BAM UserSettings"
+}
 
-:: [6] Clean user temp
-echo [6/10] Cleaning user temp files...
-del /q /f "%temp%\*" >nul 2>&1
-rd /s /q "%temp%" >nul 2>&1
+# Clean thumbnail and icon caches
+del "%localappdata%\Microsoft\Windows\Explorer\thumbcache_*.db" /f /q
+del "%localappdata%\IconCache.db" /f /q
+Write-Host "Cleaned thumbnail and icon caches"
 
-:: [7] Clean system temp
-echo [7/10] Cleaning system temp files...
-del /q /f "C:\Windows\Temp\*" >nul 2>&1
-rd /s /q "C:\Windows\Temp" >nul 2>&1
+# Clean Jump Lists
+$jumpListPath = "$env:APPDATA\Microsoft\Windows\Recent\AutomaticDestinations"
+if (Test-Path $jumpListPath) {
+    Remove-Item -Path $jumpListPath -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Cleaned Jump Lists"
+}
 
-:: [8] Clean recent files
-echo [8/10] Cleaning recent items...
-del /q /f "%APPDATA%\Microsoft\Windows\Recent\*" >nul 2>&1
+# Taskkill Explorer and clear system memory
+taskkill /f /im explorer.exe
+Start-Sleep -Seconds 2
+powershell -Command "& {Add-Type -AssemblyName System.DirectoryServices.AccountManagement; Start-Sleep -Seconds 2; [System.GC]::Collect(); [System.GC]::WaitForPendingFinalizers();}" >nul 2>&1
 
-:: [9] Clear admin credentials
-echo [9/10] Clearing stored admin credentials...
-for /f "tokens=3" %%i in ('cmdkey /list ^| findstr Target') do cmdkey /delete %%i >nul 2>&1
+# Restart Explorer
+Start-Process explorer.exe
 
-:: [10] Clean NVIDIA ConsoleHost and PowerShell history
-echo [10/10] Cleaning NVIDIA and PowerShell history...
-powershell -Command "$HistoryFilePath = Join-Path ([Environment]::GetFolderPath('UserProfile')) -ChildPath 'ConsoleHost_history.txt'; Remove-Item -Path $HistoryFilePath -Force -ErrorAction SilentlyContinue"
+# Verify Explorer is running and restart if necessary
+Start-Sleep -Seconds 2
+if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) {
+    Start-Process explorer.exe
+}
 
-echo.
-echo -------------------------------------------------------
-echo                Custom Cleanup Complete!                
-echo -------------------------------------------------------
-timeout /t 3 /nobreak >nul
-exit
-"@
-
-$batFile = [System.IO.Path]::Combine($env:TEMP, "TemporaryFileCleaner.bat")
-$batchScript | Set-Content -Path $batFile
-
-Start-Process "cmd.exe" -ArgumentList "/c $batFile" -NoNewWindow -Wait
-
-Remove-Item -Path $batFile
+Write-Host "Cleaning complete."
