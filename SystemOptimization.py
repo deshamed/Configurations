@@ -66,7 +66,7 @@ def find_strings(data, min_len=6):
 def auto_clean():
     process_name = "explorer.exe"
     keywords = [
-        "Matrix", "Software", "Assembly", "Authenticator", "Bootstrapper", "Loader", "Thunder", "Software.exe", "Photon", "Yerba", "Celex", "Imgui"
+        "matrix", "thunder", "celex", "severe", "authenticator", "isabelle", "swift", "xeno", "wavebootstrapper", "photon", "yerba", "matcha", "mapper", "assembly", "imgui"
     ]
 
     print(f"[*] Scanning process: {process_name}")
@@ -77,22 +77,19 @@ def auto_clean():
 
         for base, size in get_memory_regions(pm):
             try:
-                # Read memory in smaller chunks to capture strings that might be split
-                chunk_size = 4096
-                for offset in range(0, size, chunk_size):
-                    data = pm.read_bytes(base + offset, min(chunk_size, size - offset))
-                    for string_offset, string in find_strings(data):
-                        absolute_offset = base + offset + string_offset
-                        if any(k in string.lower() for k in keywords):
-                            try:
-                                pm.write_string(absolute_offset, '.' * len(string))
-                                print(f"[✓] {hex(absolute_offset)} | {string}")
-                                cleaned += 1
-                            except Exception as e:
-                                print(f"[!] Error writing to memory at {hex(absolute_offset)}: {e}")
+                data = pm.read_bytes(base, size)
             except Exception as e:
                 print(f"[!] Error reading memory at {hex(base)}: {e}")
                 continue
+
+            for offset, string in find_strings(data):
+                if any(k in string.lower() for k in keywords):
+                    try:
+                        pm.write_string(base + offset, '.' * len(string))
+                        print(f"[✓] {hex(base + offset)} | {string}")
+                        cleaned += 1
+                    except Exception as e:
+                        print(f"[!] Error writing to memory at {hex(base + offset)}: {e}")
 
         print(f"\n[✓] Done. Cleaned {cleaned} matching string(s).")
 
