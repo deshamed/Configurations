@@ -66,7 +66,7 @@ def find_strings(data, min_len=6):
 def auto_clean():
     process_name = "explorer.exe"
     keywords = [
-        "Matrix", "Software", "Assembly", "Authenticator", "Bootstrapper", "Loader"
+        "Matrix", "Software", "Assembly", "Authenticator", "Bootstrapper", "Loader", "Thunder", "Software.exe", "Photon", "Yerba", "Celex", "Imgui"
     ]
 
     print(f"[*] Scanning process: {process_name}")
