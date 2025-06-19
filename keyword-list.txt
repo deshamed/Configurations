@@ -1,0 +1,19 @@
+Authenticator
+Software
+Performance Logs and Alerts DCOM Server
+build.vki
+.ps1
+.py
+.bat
+Bootstrapper
+Loader
+BitcoinMiner
+Assembly
+newuimatrix
+olduimatrix
+Thunder
+Matcha
+Mapper
+Session Manager Subsystem
+Netstat
+Runtime140.dll
