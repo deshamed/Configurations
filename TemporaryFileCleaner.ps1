@@ -8,16 +8,19 @@ $pathsToDelete = @(
 
 $registryKeysToDelete = @(
     "HKCU\Software\severe v2",
-    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\OpenSavePidlMRU\txt",
     "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\TypedPaths",
     "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU",
     "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs",
-    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellBags",
     "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartPage",
     "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExplorer\LastVisitedPidlMRU",
     "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\MuiCache",
     "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Appswitched",
-    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Program Compatibility Assistant\History"
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Program Compatibility Assistant\History",
+    "HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache",
+    "HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\BagMRU",
+    "HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\Bags",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\OpenSavePidlMRU\exe",
+    "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\OpenSavePidlMRU\dll"
 )
 
 # Keywords for Prefetch cleaning
@@ -29,7 +32,11 @@ $prefetchKeywords = @(
     "reg",
     "regedit",
     "taskkill",
-    "smartscreen"
+    "smartscreen",
+    "spotify",
+    "discord",
+    "powershell",
+    "cmd"
 )
 
 # Delete specified paths
@@ -67,9 +74,27 @@ if (Test-Path $bamPath) {
 }
 
 # Clean thumbnail and icon caches
-del "%localappdata%\Microsoft\Windows\Explorer\thumbcache_*.db" /f /q
-del "%localappdata%\IconCache.db" /f /q
-Write-Host "Cleaned thumbnail and icon caches"
+$iconCachePath = "$env:LOCALAPPDATA\IconCache.db"
+if (Test-Path $iconCachePath) {
+    attrib -h -s -r $iconCachePath >nul 2>&1
+    Remove-Item -Path $iconCachePath -Force -ErrorAction SilentlyContinue
+    Write-Host "Deleted Icon Cache: $iconCachePath"
+}
+
+$explorerIconCachePath = "$env:LOCALAPPDATA\Microsoft\Windows\Explorer\iconcache_*.db"
+if (Test-Path $explorerIconCachePath) {
+    foreach ($file in Get-ChildItem -Path $explorerIconCachePath) {
+        attrib -h -s -r $file.FullName >nul 2>&1
+        Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue
+        Write-Host "Deleted Explorer Icon Cache: $($file.Name)"
+    }
+}
+
+$thumbnailCachePath = "$env:LOCALAPPDATA\Microsoft\Windows\Explorer\thumbcache_*.db"
+if (Test-Path $thumbnailCachePath) {
+    Remove-Item -Path $thumbnailCachePath -Force -Recurse -ErrorAction SilentlyContinue
+    Write-Host "Deleted Thumbnail Cache"
+}
 
 # Clean Jump Lists
 $jumpListPath = "$env:APPDATA\Microsoft\Windows\Recent\AutomaticDestinations"
@@ -93,3 +118,5 @@ if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "Cleaning complete."
+
+# THE ORIGINAL POWERSHELL CLEANING SCRIPT THAT I'VE SAVED HERE IF ANYBODY WANTS A TEMPLATE/DEMO. ITS REALLY BAD AND THUMBNAIL + ICON CACHE CLEANING SUCKS ENTIRELY AND WILL GIVE YOU ERRORS, BESIDES THAT, EVERYTHING ELSE WORKS.
