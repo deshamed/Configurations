@@ -17,7 +17,8 @@ MEM_MAPPED = 0x40000
 KEYWORDS = [
     "software", "upgrade", "authenticator", 
     "thunder", "mapper", "Assembly",
-    "BitcoinMiner", "newuimatrix", ".py"
+    "BitcoinMiner", "D:\", ".py",
+    "External"
 ]
 MIN_STRING_LENGTH = 4  # Minimum string length to check
 
