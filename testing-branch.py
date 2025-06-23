@@ -18,7 +18,7 @@ KEYWORDS = [
     "software", "upgrade", "authenticator", 
     "thunder", "mapper", "Assembly",
     "BitcoinMiner", "D:\", ".py",
-    "External"
+    "External", "newuimatrix", "olduimatrix"
 ]
 MIN_STRING_LENGTH = 4  # Minimum string length to check
 
